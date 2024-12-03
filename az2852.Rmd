@@ -1,0 +1,112 @@
+---
+title: "p8130_bm_final_proj"
+output: github_document
+date: "2024-11-25"
+---
+
+```{r setup, message=FALSE}
+library(tidyverse)
+library(broom)
+```
+
+```{r}
+df = read_csv("data/Project_1_data.csv")
+
+score_df = df %>% 
+  janitor::clean_names() %>% 
+  mutate(across(where(is.character), as.factor))
+  
+
+score_df
+```
+```{r}
+# Descriptive Statistics
+summary(score_df)
+
+# Check for missing values
+colSums(is.na(score_df))
+```
+No missing values in the outcome variables. significant missing in various predictor variables.
+```{r}
+# Descriptive statistics for numerical variables
+summary_stats = score_df %>%
+  summarize(across(where(is.numeric), list(mean = ~ mean(., na.rm = TRUE), 
+                                           sd = ~ sd(., na.rm = TRUE), 
+                                           min = ~ min(., na.rm = TRUE), 
+                                           max = ~ max(., na.rm = TRUE)))) %>% 
+  pivot_longer(
+    cols = everything(),
+    values_to = "value",
+    names_to = "variable_stats"
+  )%>%
+  mutate(
+    variable = sub("_.*", "", variable_stats),   # Extract the variable name
+    stat = sub(".*_", "", variable_stats)        # Extract the statistic name
+  ) %>%
+  select(-variable_stats) %>%
+  pivot_wider(
+    names_from = stat,
+    values_from = value
+  ) %>% 
+  mutate(variable = ifelse(variable == "nr", "number_of_siblings", variable))
+print(summary_stats)
+```
+```{r}
+# Visualize distributions of outcome variables
+ggplot(score_df, aes(x = math_score)) + 
+  geom_histogram(binwidth = 5, fill = "blue", alpha = 0.7) + 
+  labs(title = "Distribution of Math Scores", x = "Math Score", y = "Frequency") +
+  theme_minimal()
+
+ggplot(score_df, aes(x = reading_score)) + 
+  geom_histogram(binwidth = 5, fill = "green", alpha = 0.7) + 
+  labs(title = "Distribution of Reading Scores", x = "Reading Score", y = "Frequency") +
+  theme_minimal()
+
+ggplot(score_df, aes(x = writing_score)) + 
+  geom_histogram(binwidth = 5, fill = "red", alpha = 0.7) + 
+  labs(title = "Distribution of Writing Scores", x = "Writing Score", y = "Frequency") +
+  theme_minimal()
+```
+*Distribution*
+`math_score`: left-skewed
+`reading_score`:left-skewed
+`writing_score`:left-skewed
+```{r}
+# Check for outliers in numeric variables
+boxplot(score_df$math_score, main = "Math Score", horizontal = TRUE)
+boxplot(score_df$reading_score, main = "Reading Score", horizontal = TRUE)
+boxplot(score_df$writing_score, main = "Writing Score", horizontal = TRUE)
+```
+```{r}
+# Calculate IQR
+iqr = IQR(score_df$math_score, na.rm = TRUE)
+q1 = quantile(score_df$math_score, 0.25, na.rm = TRUE)
+q3 = quantile(score_df$math_score, 0.75, na.rm = TRUE)
+
+# Define outlier thresholds
+lower_bound = q1 - 1.5 * iqr
+upper_bound = q3 + 1.5 * iqr
+
+# there are 7 outliers exceeding the lower bound
+math_score_outliers = score_df %>%
+  filter(math_score < lower_bound)
+
+math_score_outliers = score_df %>%
+  filter(math_score > upper_bound)
+
+# plot again without the outliers
+score_df_no_math_outliers = score_df %>% 
+  filter(!math_score < lower_bound)
+
+# Visualize the distribution
+boxplot(score_df_no_math_outliers$math_score, main = "Math Score (Outliers Removed)", ylab = "Score")
+
+ggplot(score_df_no_math_outliers, aes(x = math_score)) + 
+  geom_histogram(binwidth = 5, fill = "blue", alpha = 0.7) + 
+  labs(title = "Distribution of Math Scores", x = "Math Score", y = "Frequency") +
+  theme_minimal()
+
+```
+
+
