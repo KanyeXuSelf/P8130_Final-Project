@@ -1,0 +1,54 @@
+---
+title: "Reading_score"
+author: "Kangyu Xu (kx2224)"
+date: "2024-12-08"
+output: html_document
+---
+
+```{r}
+library(tidyverse)
+library(broom)
+library(caret) # 用于特征重要性评估
+```
+## Data Preparation
+```{r}
+df = read_csv("data/Project_1_data.csv")
+
+score_df = df %>% 
+  janitor::clean_names() %>% 
+  mutate(across(where(is.character), as.factor))
+
+score_df_sib <- score_df %>%
+  mutate(nr_siblings = as.factor(nr_siblings))
+
+# Check for missing values
+colSums(is.na(score_df))
+```
+
+```{r}
+score_df_omit = score_df|> 
+  na.omit()
+
+score_df_mean = score_df|>
+  mutate(across(where(is.numeric), ~ ifelse(is.na(.), mean(., na.rm = TRUE), .))) |>
+   na.omit()
+
+score_df_sib_mean = score_df_sib|>
+  mutate(across(where(is.numeric), ~ ifelse(is.na(.), mean(., na.rm = TRUE), .))) |>
+   na.omit()
+  
+```
+
+```{r}
+score_df_mean
+```
+## Build model
+```{r}
+
+```
+
+## Analyse variables
+```{r}
+
+```
+
