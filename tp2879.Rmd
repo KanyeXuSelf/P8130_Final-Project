@@ -5,19 +5,23 @@ output: github_document
 
 ```{r setup, include=FALSE}
 library(tidyverse)
+library(dplyr)
 ```
 
 
 ### Import and Clean the Data
 ```{r}
 writing = read.csv(file = "./data/Project_1_data.csv") |> 
-  janitor::clean_names() 
-
+  janitor::clean_names() |> 
+  mutate(across(where(is.character), ~na_if(.x, "")))
+  
+writing = writing |> 
+  filter(!is.na(writing_score))
 head(writing)
 ```
 
-*replace blanks with NA
-* get rid of NA in specific plots
+
+*    get rid of NA in specific plots
 
 ### Descriptive Statistics
 ```{r}
@@ -61,6 +65,96 @@ ggplot(writing, aes(x = gender, y = writing_score)) +
   labs(
     title = "Writing Scores by Gender",
     x = "Gender",
+    y = "Writing Score")
+```
+
+```{r}
+ggplot(writing, aes(x = ethnic_group, y = writing_score)) +
+  geom_boxplot(fill = "lightgreen") +
+  labs(
+    title = "Writing Scores by Ethnic Group",
+    x = "Ethnic Group",
+    y = "Writing Score")
+```
+
+```{r}
+ggplot(writing, aes(x = parent_educ, y = writing_score)) +
+  geom_boxplot(fill = "lightpink") +
+  labs(
+    title = "Writing Scores by Parent Education",
+    x = "Parent Education",
+    y = "Writing Score")
+```
+
+```{r}
+ggplot(writing, aes(x = lunch_type, y = writing_score)) +
+  geom_boxplot(fill = "yellow") +
+  labs(
+    title = "Writing Scores by Lunch Type",
+    x = "Lunch Type",
+    y = "Writing Score")
+```
+
+```{r}
+ggplot(writing, aes(x = test_prep, y = writing_score)) +
+  geom_boxplot(fill = "orange") +
+  labs(
+    title = "Writing Scores by Test Prep",
+    x = "Test Prep",
+    y = "Writing Score")
+```
+
+```{r}
+ggplot(writing, aes(x = parent_marital_status, y = writing_score)) +
+  geom_boxplot(fill = "navyblue") +
+  labs(
+    title = "Writing Scores by Parent Marital Status",
+    x = "Parent Marital Status",
+    y = "Writing Score")
+```
+
+```{r}
+ggplot(writing, aes(x = practice_sport, y = writing_score)) +
+  geom_boxplot(fill = "thistle") +
+  labs(
+    title = "Writing Scores by Practice Sport",
+    x = "Practice Sport",
+    y = "Writing Score")
+```
+
+```{r}
+ggplot(writing, aes(x = is_first_child, y = writing_score)) +
+  geom_boxplot(fill = "sienna") +
+  labs(
+    title = "Writing Scores by First Child",
+    x = "First Child",
+    y = "Writing Score")
+```
+
+```{r}
+ggplot(writing, aes(x = nr_siblings, y = writing_score)) +
+  geom_boxplot(fill = "salmon") +
+  labs(
+    title = "Writing Scores by Number of Siblings",
+    x = "Number of Siblings",
+    y = "Writing Score")
+```
+
+```{r}
+ggplot(writing, aes(x = transport_means, y = writing_score)) +
+  geom_boxplot(fill = "royalblue") +
+  labs(
+    title = "Writing Scores by Transportation Means",
+    x = "Transportation Means",
+    y = "Writing Score")
+```
+
+```{r}
+ggplot(writing, aes(x = wkly_study_hours, y = writing_score)) +
+  geom_boxplot(fill = "orchid") +
+  labs(
+    title = "Writing Scores by Weekly Study Hours",
+    x = "Weekly Study Hours",
     y = "Writing Score")
 ```
 
