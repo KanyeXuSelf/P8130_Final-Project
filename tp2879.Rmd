@@ -1,0 +1,72 @@
+---
+title: "Writing Scores Analysis"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+```
+
+
+### Import and Clean the Data
+```{r}
+writing = read.csv(file = "./data/Project_1_data.csv") |> 
+  janitor::clean_names() 
+
+head(writing)
+```
+
+*replace blanks with NA
+* get rid of NA in specific plots
+
+### Descriptive Statistics
+```{r}
+summary(writing$writing_score)
+
+var(writing$writing_score)
+sd(writing$writing_score)
+```
+
+
+### Percentiles
+```{r}
+percentiles = quantile(writing$writing_score, probs = seq(0.1, 1, by = 0.1))
+
+print(percentiles)
+```
+
+
+### Visualizations
+```{r}
+ggplot(writing, aes(x = writing_score)) +
+  geom_histogram(binwidth = 5, fill = "blue", color = "black", alpha = 0.7) +
+  labs(
+    title = "Distribution of Writing Scores",
+    x = "Score",
+    y = "Frequency")
+```
+
+```{r}
+ggplot(writing, aes(x = writing_score)) +
+  geom_density(fill = "purple", alpha = 0.5) +
+  labs(
+    title = "Density Plot of Writing Scores",
+    x = "Writing Score",
+    y = "Density")
+```
+
+```{r}
+ggplot(writing, aes(x = gender, y = writing_score)) +
+  geom_boxplot(fill = "lightblue") +
+  labs(
+    title = "Writing Scores by Gender",
+    x = "Gender",
+    y = "Writing Score")
+```
+
+### Statistical Testing
+```{r}
+t_test = t.test(writing_score ~ gender, data = writing)
+
+print(t_test)
+```
