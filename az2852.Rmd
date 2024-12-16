@@ -2,11 +2,19 @@
 title: "p8130_bm_final_proj"
 output: github_document
 date: "2024-11-25"
+editor_options: 
+  chunk_output_type: inline
 ---
 
 ```{r setup, message=FALSE}
 library(tidyverse)
-library(broom)
+library(corrplot)
+library(leaps)
+library(glmnet)
+library(faraway)
+library(caret)
+library(MASS) # boxcox
+library(performance) # vif
 ```
 
 ```{r}
@@ -14,10 +22,17 @@ df = read_csv("data/Project_1_data.csv")
 
 score_df = df %>% 
   janitor::clean_names() %>% 
+  drop_na() %>% # Drop rows with any missing values
   mutate(across(where(is.character), as.factor))
   
 
 score_df
+
+#create a df just for predicting math score
+math_df = 
+  score_df %>% 
+  dplyr::select(-reading_score, -writing_score) %>% 
+  dplyr::select(math_score, everything())
 ```
 ```{r}
 # Descriptive Statistics
@@ -27,30 +42,6 @@ summary(score_df)
 colSums(is.na(score_df))
 ```
 No missing values in the outcome variables. significant missing in various predictor variables.
-```{r}
-# Descriptive statistics for numerical variables
-summary_stats = score_df %>%
-  summarize(across(where(is.numeric), list(mean = ~ mean(., na.rm = TRUE), 
-                                           sd = ~ sd(., na.rm = TRUE), 
-                                           min = ~ min(., na.rm = TRUE), 
-                                           max = ~ max(., na.rm = TRUE)))) %>% 
-  pivot_longer(
-    cols = everything(),
-    values_to = "value",
-    names_to = "variable_stats"
-  )%>%
-  mutate(
-    variable = sub("_.*", "", variable_stats),   # Extract the variable name
-    stat = sub(".*_", "", variable_stats)        # Extract the statistic name
-  ) %>%
-  select(-variable_stats) %>%
-  pivot_wider(
-    names_from = stat,
-    values_from = value
-  ) %>% 
-  mutate(variable = ifelse(variable == "nr", "number_of_siblings", variable))
-print(summary_stats)
-```
 ```{r}
 # Visualize distributions of outcome variables
 ggplot(score_df, aes(x = math_score)) + 
@@ -68,44 +59,518 @@ ggplot(score_df, aes(x = writing_score)) +
   labs(title = "Distribution of Writing Scores", x = "Writing Score", y = "Frequency") +
   theme_minimal()
 ```
-*Distribution*
-`math_score`: left-skewed
-`reading_score`:left-skewed
-`writing_score`:left-skewed
 ```{r}
-# Check for outliers in numeric variables
-boxplot(score_df$math_score, main = "Math Score", horizontal = TRUE)
-boxplot(score_df$reading_score, main = "Reading Score", horizontal = TRUE)
-boxplot(score_df$writing_score, main = "Writing Score", horizontal = TRUE)
+par(mfrow=c(1,3))
+boxplot(score_df$math_score, main='math_score')
+boxplot(score_df$reading_score, main='reading_score')
+boxplot(score_df$writing_score, main='writing_score')
+```
+
+```{r}
+library(patchwork)
+
+# Create individual bar plots for each categorical variable
+plot_gender <- ggplot(score_df, aes(x = gender)) +
+  geom_bar(fill = "skyblue") +
+  labs(title = "Gender Distribution", x = "Gender", y = "Count") +
+  theme_minimal()
+
+plot_ethnic_group <- ggplot(score_df, aes(x = ethnic_group)) +
+  geom_bar(fill = "lightgreen") +
+  labs(title = "Ethnic Group Distribution", x = "Ethnic Group", y = "Count") +
+  theme_minimal()
+
+plot_parent_educ <- ggplot(score_df, aes(x = parent_educ)) +
+  geom_bar(fill = "purple") +
+  labs(title = "Parent Education Distribution", x = "Parent Education", y = "Count") +
+  theme_minimal()
+
+plot_lunch_type <- ggplot(score_df, aes(x = lunch_type)) +
+  geom_bar(fill = "orange") +
+  labs(title = "Lunch Type Distribution", x = "Lunch Type", y = "Count") +
+  theme_minimal()
+
+plot_test_prep <- ggplot(score_df, aes(x = test_prep)) +
+  geom_bar(fill = "pink") +
+  labs(title = "Test Prep Distribution", x = "Test Prep", y = "Count") +
+  theme_minimal()
+
+plot_practice_sport <- ggplot(score_df, aes(x = practice_sport)) +
+  geom_bar(fill = "cyan") +
+  labs(title = "Practice Sport Distribution", x = "Practice Sport", y = "Count") +
+  theme_minimal()
+
+# Example for other variables (add similar code for all remaining variables)
+plot_is_first_child <- ggplot(score_df, aes(x = is_first_child)) +
+  geom_bar(fill = "lightblue") +
+  labs(title = "First Child Status Distribution", x = "Is First Child", y = "Count") +
+  theme_minimal()
+
+plot_nr_siblings <- ggplot(score_df, aes(x = factor(nr_siblings))) +
+  geom_bar(fill = "red") +
+  labs(title = "Number of Siblings Distribution", x = "Number of Siblings", y = "Count") +
+  theme_minimal()
+
+plot_transport_means <- ggplot(score_df, aes(x = transport_means)) +
+  geom_bar(fill = "gold") +
+  labs(title = "Transport Means Distribution", x = "Transport Means", y = "Count") +
+  theme_minimal()
+
+plot_wkly_study_hours <- ggplot(score_df, aes(x = wkly_study_hours)) +
+  geom_bar(fill = "darkgreen") +
+  labs(title = "Weekly Study Hours Distribution", x = "Weekly Study Hours", y = "Count") +
+  theme_minimal()
+
+# Adjusting plot layout with more vertical space
+combined_plot <- (
+  plot_gender + plot_ethnic_group + plot_parent_educ +
+  plot_lunch_type + plot_test_prep + plot_practice_sport +
+  plot_is_first_child + plot_nr_siblings +
+  plot_transport_means + plot_wkly_study_hours
+) + plot_layout(ncol = 2, heights = c(1, 1, 1, 1, 1)) # Adjust the number of rows to your needs
+
+# Save as a larger plot with better dimensions
+ggsave("combined_plot.png", combined_plot, width = 12, height = 18) # Adjust height/width
+
+# Display the adjusted plot
+print(combined_plot)
+
+
+```
+visualize correlations
+```{r}
+pairs(math_df_numeric)
+corrplot(cor(math_df_numeric), type = "upper", diag = FALSE)
+
+
+# Adjust the color scale to increase visibility
+corrplot(cor(math_df_numeric), 
+         type = "upper",           # Only show the upper part of the matrix
+         diag = FALSE,             # Hide diagonal
+         col = colorRampPalette(c("blue", "white", "red"))(200),  # Custom color scale
+         is.corr = TRUE,           # Treat input as correlations
+         tl.col = "black",         # Text label color
+         tl.srt = 45,              # Rotate text labels
+         cl.lim = c(-1, 1),        # Set limits for the color legend
+         method = "color",         # Use color shading to represent values
+         number.cex = 0.7)         # Adjust size of correlation coefficients
+
+```
+looks like math score is correlated with gender, ethnic group, parent education, lunch type, and test prep. Also slightly correlated with nr siblings and weekly study hours
+
+correlation between predictors:
+marital status & is first child
+parent education & nr siblings, transportation means
+test prep & is first child, nr siblings, transportation means, weekly study hours
+is first child & nr siblings
+
+
+Use automatic procedures to find a ‘best subset’ of the full model for predicting math scores.
+
+```{r}
+# Full model
+full_model <- lm(math_score ~ ., data = math_df)
+
+summary(full_model)
+```
+
+```{r}
+# Backward elimination
+backward_model <- step(full_model, direction = "backward")
+
+summary(backward_model)
 ```
 ```{r}
-# Calculate IQR
-iqr = IQR(score_df$math_score, na.rm = TRUE)
-q1 = quantile(score_df$math_score, 0.25, na.rm = TRUE)
-q3 = quantile(score_df$math_score, 0.75, na.rm = TRUE)
+# Null model (no predictors)
+null_model <- lm(math_score ~ 1, data = math_df)
 
-# Define outlier thresholds
-lower_bound = q1 - 1.5 * iqr
-upper_bound = q3 + 1.5 * iqr
+# Forward selection
+forward_model <- step(null_model, direction = "forward", scope = formula(full_model))
 
-# there are 7 outliers exceeding the lower bound
-math_score_outliers = score_df %>%
-  filter(math_score < lower_bound)
+# Summary of the final model
+summary(forward_model)
+```
+```{r}
+# Stepwise regression
+stepwise_model <- step(full_model, direction = "both")
 
-math_score_outliers = score_df %>%
-  filter(math_score > upper_bound)
+# Summary of the final model
+summary(stepwise_model)
+```
 
-# plot again without the outliers
-score_df_no_math_outliers = score_df %>% 
-  filter(!math_score < lower_bound)
+* Do the procedures generate the same model?
 
-# Visualize the distribution
-boxplot(score_df_no_math_outliers$math_score, main = "Math Score (Outliers Removed)", ylab = "Score")
+### backward elimination model
+significant predictors (7), same as stepwise model: 
+`gender`
+`ethnic_group`
+`parent_educ`
+`lunch_type`
+`test_prep`
+`parent_marital_status`
+`wkly_study_hours`
 
-ggplot(score_df_no_math_outliers, aes(x = math_score)) + 
-  geom_histogram(binwidth = 5, fill = "blue", alpha = 0.7) + 
-  labs(title = "Distribution of Math Scores", x = "Math Score", y = "Frequency") +
-  theme_minimal()
+### forward selection model
+significant predictors (5): 
+`gender` not significant
+`ethnic_group`
+`parent_educ`
+`lunch_type`
+`test_prep` not significant
+`parent_marital_status`
+`wkly_study_hours`
+
+### step-wise regression model
+significant predictors (7): 
+`gender`
+`ethnic_group`
+`parent_educ`
+`lunch_type`
+`test_prep`
+`parent_marital_status`
+`wkly_study_hours`
+
+Since multi-colinearity can make a predictor appear less significant, we should check for it.
+```{r}
+vif(lm(math_score ~ ., data = math_df))
+```
+None of the VIFs are larger than 5, so multi-colinearity is likely not a concern.
+
+Use criterion-based procedures to guide your selection of the ‘best subset’. Summarize your results (tabular or graphical).
+```{r}
+# convert data to numeric
+math_df_numeric = math_df %>% 
+  mutate(across(where(is.factor), ~ as.numeric(.)))
+```
+
+```{r}
+mat = as.matrix(math_df_numeric)
+# Printing the 2 best models of each size, using the Cp criterion:
+leaps(x = mat[,2:12], y = mat[,1], nbest = 2, method = "Cp")
+
+# Printing the 2 best models of each size, using the adjusted R^2 criterion:
+leaps(x = mat[,2:12], y = mat[,1], nbest = 2, method = "adjr2")
+
+# Function regsubsets() performs a subset selection by identifying the "best" model that contains
+# a certain number of predictors. By default "best" is chosen using SSE/RSS (smaller is better)
+b = regsubsets(math_score ~ ., data = math_df_numeric)
+rs = summary(b)
+
+# plot of Cp and Adj-R2 as functions of parameters
+par(mfrow=c(1,2))
+
+plot(2:9, rs$cp, xlab="No of parameters", ylab="Cp Statistic")
+abline(0,1)
+
+plot(2:9, rs$adjr2, xlab="No of parameters", ylab="Adj R2")
+```
+Cp is close to p at 7 predictors; Adjusted R square increases rapidly from 2-5 predictors and peaks at 8 predictors. Overall it seems like 7 or 8 would be a good choice.
+
+Use the LASSO method to perform variable selection. Make sure you choose the “best lambda” to use and show how you determined this.
+```{r}
+# Separate the response variable (life_exp) and predictors
+y <- math_df_numeric$math_score
+X <- as.matrix(math_df_numeric[, -1])  # Exclude the response variable
+
+# Fit LASSO model with cross-validation
+lasso_cv <- cv.glmnet(X, y, alpha = 1)  # alpha = 1 for LASSO (L2 regularization)
+
+# Plot the cross-validation results
+plot(lasso_cv)
+
+# Best lambda (lambda.min is the one that minimizes cross-validation error)
+best_lambda <- lasso_cv$lambda.min
+best_lambda
+
+# Coefficients at the best lambda
+lasso_coefs <- coef(lasso_cv, s = "lambda.min")
+print(lasso_coefs)
+```
+The LASSO model narrows down to 9 predictors:
+`gender`
+`ethnic_group`
+`parent_educ`
+`lunch_type`
+`test_prep`
+`parent_marital_status`
+`wkly_study_hours`
+`is_first_child`
+`nr_siblings`
+
+# evaluating candidate models
+## MLR assumptions
+### 7-predictor model
+* how are the models in terms of assumptions?
+```{r}
+model_1 = lm(math_score ~ gender + ethnic_group + parent_educ + lunch_type
++ test_prep + parent_marital_status + wkly_study_hours, data = math_df)
+
+plot(model_1)
+```
+QQ plot doesn't seem so normal, some deviation at large values. Let's try a transformation.
+```{r}
+math_df$math_score <- math_df$math_score + 1
+
+boxcox(model_1, lambda = seq(-3, 3, by = 0.25))
+```
+looks like a power of 1.5 is recommended.
+```{r}
+math_df_tr = math_df %>% 
+  mutate(sqrt_math_score = sqrt(math_score),
+         log_math_score = log(math_score),
+         ahalf_math_score = (math_score)^1.5)
+
+model_1.5 = lm(sqrt_math_score ~ gender + ethnic_group + parent_educ + lunch_type
++ test_prep + parent_marital_status + wkly_study_hours, data = math_df_tr)
+
+model_1.6 = lm(log_math_score ~ gender + ethnic_group + parent_educ + lunch_type
++ test_prep + parent_marital_status + wkly_study_hours, data = math_df_tr)
+
+model_1.7 = lm(ahalf_math_score ~ gender + ethnic_group + parent_educ + lunch_type
++ test_prep + parent_marital_status + wkly_study_hours, data = math_df_tr)
+
+plot(model_1)
+plot(model_1.5)
+plot(model_1.6)
+plot(model_1.7)
+```
+The QQ plot did not get better with transformation.
+
+### 5-predictor model
+```{r}
+model_2 = lm(math_score ~ ethnic_group + parent_educ + lunch_type + parent_marital_status + wkly_study_hours, data = math_df)
+
+plot(model_2)
+```
+looks good (?)
+### 9-predictor model
+```{r}
+model_3 = lm(math_score ~ gender + ethnic_group + parent_educ + lunch_type
++ test_prep + parent_marital_status + wkly_study_hours + is_first_child + nr_siblings,
+data = math_df)
+
+plot(model_3)
+```
+same issue with QQ plot
+
+## Predictive power
+### 7-predictor model
+RMSE 13.70
+```{r}
+set.seed(1)
+# Use 10-fold validation and create the training sets
+train = trainControl(method = "cv", number = 10)
+
+# Fit the 4-variables model
+model_caret = train(math_score ~ gender + ethnic_group + parent_educ + lunch_type
++ test_prep + parent_marital_status + wkly_study_hours, data = math_df,
+                   trControl = train,
+                   method = 'lm',
+                   na.action = na.pass)
+
+model_caret$finalModel
+print(model_caret)
+```
+### 5-predictor model
+RMSE 14.13
+```{r}
+train = trainControl(method = "cv", number = 10)
+
+# Fit the 4-variables model
+model_caret = train(math_score ~ ethnic_group + parent_educ + lunch_type + parent_marital_status + wkly_study_hours, data = math_df,
+                   trControl = train,
+                   method = 'lm',
+                   na.action = na.pass)
+
+model_caret$finalModel
+print(model_caret)
+```
+### 9-predictor model
+RMSE 13.72
+```{r}
+train = trainControl(method = "cv", number = 10)
+
+# Fit the 9-variables model
+model_caret = train(math_score ~ gender + ethnic_group + parent_educ + lunch_type
++ test_prep + parent_marital_status + wkly_study_hours + is_first_child + nr_siblings,
+data = math_df,
+                   trControl = train,
+                   method = 'lm',
+                   na.action = na.pass)
+
+model_caret$finalModel
+print(model_caret)
+```
+
+
+```{r}
+interaction_model_9 = lm(math_score ~ (gender + ethnic_group + parent_educ + lunch_type
++ test_prep + parent_marital_status + wkly_study_hours + is_first_child + nr_siblings)^2, 
+                        data = math_df)
+
+model_summary = summary(interaction_model_9)
+
+coeff_table <- model_summary$coefficients
+
+# Filter for significant terms (p-value < 0.05)
+significant_terms <- coeff_table[coeff_table[, "Pr(>|t|)"] < 0.05, ]
+
+# Create a data frame for better readability
+significant_terms_df <- data.frame(
+  Term = rownames(significant_terms),
+  Coefficient = significant_terms[, "Estimate"],
+  P_Value = significant_terms[, "Pr(>|t|)"]
+)
+
+# Print the significant terms
+print(significant_terms_df)
+  
+```
+interactions: ethnic group E and test prep none
+```{r}
+interaction_model = lm(math_score ~ parent_educ+
+test_prep+ 
+parent_marital_status+
+gender*parent_educ+
+ethnic_group*test_prep + 
+parent_educ*parent_marital_status+ 
+parent_marital_status*wkly_study_hours+ 
+parent_marital_status*is_first_child, data = math_df)
+
+summary(interaction_model)
+  
+```
+
+
+
+Overall, the 7 predictors is the best (?)
+
+
+# are there interaction effects?
+```{r}
+ # Fit a linear model with all two-way interactions
+interaction_model <- lm(math_score ~ (gender + ethnic_group + parent_educ + lunch_type + 
+                                      test_prep + parent_marital_status + practice_sport + 
+                                      is_first_child + nr_siblings + transport_means + 
+                                      wkly_study_hours)^2, 
+                        data = math_df)
+
+# Summarize the model
+model_summary = summary(interaction_model)
+
+coeff_table <- model_summary$coefficients
+
+# Filter for significant terms (p-value < 0.05)
+significant_terms <- coeff_table[coeff_table[, "Pr(>|t|)"] < 0.05, ]
+
+# Create a data frame for better readability
+significant_terms_df <- data.frame(
+  Term = rownames(significant_terms),
+  Coefficient = significant_terms[, "Estimate"],
+  P_Value = significant_terms[, "Pr(>|t|)"]
+)
+
+# Print the significant terms
+print(significant_terms_df)
+```
+
+Adjusted R-squared:  0.3513
+```{r}
+# Perform stepwise selection
+final_model <- stepAIC(interaction_model, direction = "both")
+
+# Summarize the final model
+summary(final_model)
+
+# Extract the summary of the final model
+model_summary <- summary(final_model)
+
+# Get the coefficients table
+coeff_table <- model_summary$coefficients
+
+# Filter for significant terms (p-value < 0.05)
+significant_terms <- coeff_table[coeff_table[, "Pr(>|t|)"] < 0.05, ]
+
+# Create a data frame for better readability
+significant_terms_df <- data.frame(
+  Term = rownames(significant_terms),
+  Coefficient = significant_terms[, "Estimate"],
+  P_Value = significant_terms[, "Pr(>|t|)"]
+)
+
+# Print the significant terms
+print(significant_terms_df)
+```
+check for redundant predictors
+```{r}
+vif(final_model)
+
+# Calculate VIF
+vif_values <- vif(final_model)
+
+# extract terms with VIF > 5
+high_vif_terms <- vif_values[vif_values > 5]
+high_vif_terms
+```
+Cross-tabulation to check for correlation between categorical variables
+```{r}
+cat_vars <- c("gender", "ethnic_group", "parent_educ", "lunch_type", 
+              "test_prep", "parent_marital_status", "practice_sport", 
+              "is_first_child", "transport_means", "wkly_study_hours")
+
+for (i in 1:(length(cat_vars) - 1)) {
+  for (j in (i + 1):length(cat_vars)) {
+    cat("\nCross-tabulation: ", cat_vars[i], " vs ", cat_vars[j], "\n")
+    print(table(math_df[[cat_vars[i]]], math_df[[cat_vars[j]]]))
+    print(chisq.test(table(math_df[[cat_vars[i]]], math_df[[cat_vars[j]]]))$p.value)
+  }
+}
+
+```
+
+```{r}
+cat_vars <- c("gender", "ethnic_group", "parent_educ", "lunch_type", 
+              "test_prep", "parent_marital_status", "practice_sport", 
+              "is_first_child", "transport_means", "wkly_study_hours")
+
+significant_pairs <- list()  # To store the significant variable pairs
+
+for (i in 1:(length(cat_vars) - 1)) {
+  for (j in (i + 1):length(cat_vars)) {
+    # Cross-tabulation table
+    ctab <- table(math_df[[cat_vars[i]]], math_df[[cat_vars[j]]])
+    
+    # Perform Chi-square test
+    chi_result <- chisq.test(ctab)
+    
+    # Check if the p-value is significant
+    if (chi_result$p.value < 0.1) {
+      cat("\nSignificant dependent variables: ", cat_vars[i], " vs ", cat_vars[j], "\n")
+      cat("p-value:", chi_result$p.value, "\n")
+      significant_pairs[[length(significant_pairs) + 1]] <- c(cat_vars[i], cat_vars[j], chi_result$p.value)
+    }
+  }
+}
+
+# Print the significant pairs
+if (length(significant_pairs) > 0) {
+  cat("\nSignificant variable pairs:\n")
+  print(significant_pairs)
+} else {
+  cat("\nNo significant dependencies found.\n")
+}
+
+```
+
+
+
+# lasso
+```{r}
+x <- model.matrix(math_score ~ ., data = math_df_numeric)[, -1]
+y <- math_df_numeric$math_score
+
+lasso_model <- cv.glmnet(x, y, alpha = 1)
+coef(lasso_model, s = "lambda.min")
 
 ```
 
