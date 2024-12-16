@@ -38,7 +38,7 @@ math_df =
 math_df_numeric = math_df %>% 
   mutate(across(where(is.factor), ~ as.numeric(.)))
 ```
-```
+
 ```{r}
 # Descriptive Statistics
 summary(score_df)
