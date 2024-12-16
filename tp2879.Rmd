@@ -10,7 +10,7 @@ library(MASS)
 ```
 
 
-### Import and Clean the Data
+## Import and Clean the Data
 ```{r}
 writing = read.csv(file = "./data/Project_1_data.csv") |> 
   janitor::clean_names() |> 
@@ -24,7 +24,7 @@ head(writing)
 ```
 
 
-### Descriptive Statistics
+## Descriptive Statistics
 ```{r}
 summary(writing$writing_score)
 
@@ -33,7 +33,7 @@ sd(writing$writing_score)
 ```
 
 
-### Percentiles
+## Percentiles
 ```{r}
 percentiles = quantile(writing$writing_score, probs = seq(0.1, 1, by = 0.1))
 
@@ -41,7 +41,7 @@ print(percentiles)
 ```
 
 
-### Visualizations
+## Visualizations
 ```{r}
 ggplot(writing, aes(x = writing_score)) +
   geom_histogram(binwidth = 5, fill = "blue", color = "black", alpha = 0.7) +
@@ -160,16 +160,16 @@ ggplot(writing, aes(x = wkly_study_hours, y = writing_score)) +
     y = "Writing Score")
 ```
 
-### Statistical Testing
+## Statistical Testing
 
-Linear Regression 
+### Linear Regression 
 ```{r}
 lm_model = lm(writing_score ~ gender + ethnic_group + parent_educ + lunch_type + test_prep + parent_marital_status + practice_sport + is_first_child + nr_siblings + transport_means + wkly_study_hours, data = writing)
 
 summary(lm_model)
 ```
 
-Correlation Matrix
+### Correlation Matrix
 ```{r}
 writing = writing |> 
   mutate(across(c(gender, ethnic_group, parent_educ, lunch_type, test_prep, parent_marital_status, practice_sport, is_first_child, nr_siblings, transport_means, wkly_study_hours), as.factor))
@@ -191,7 +191,7 @@ cor_table = knitr::kable(cor_matrix, format = "markdown")
 print(cor_table)
 ```
 
-Backward Elimination Method
+### Backward Elimination Method
 ```{r}
 full_model = lm(writing_score ~ gender + ethnic_group + parent_educ + lunch_type + test_prep + parent_marital_status + practice_sport + is_first_child + nr_siblings + transport_means + wkly_study_hours, data = writing)
 
@@ -212,7 +212,7 @@ summary(forward_model)
 ```
 
 
-Stepwise Method (stepAIC)
+### Stepwise Method (stepAIC)
 ```{r}
 null_model = lm(writing_score ~ 1, data = writing)
 
