@@ -6,6 +6,7 @@ output: github_document
 ```{r setup, include=FALSE}
 library(tidyverse)
 library(dplyr)
+library(MASS)
 ```
 
 
@@ -16,7 +17,9 @@ writing = read.csv(file = "./data/Project_1_data.csv") |>
   mutate(across(where(is.character), ~na_if(.x, "")))
   
 writing = writing |> 
-  filter(!is.na(writing_score))
+  filter(!is.na(writing_score)) |> 
+  drop_na()
+
 head(writing)
 ```
 
@@ -158,15 +161,63 @@ ggplot(writing, aes(x = wkly_study_hours, y = writing_score)) +
 ```
 
 ### Statistical Testing
-```{r}
-t_test = t.test(writing_score ~ gender, data = writing)
 
-print(t_test)
-```
-
+Linear Regression 
 ```{r}
 lm_model = lm(writing_score ~ gender + ethnic_group + parent_educ + lunch_type + test_prep + parent_marital_status + practice_sport + is_first_child + nr_siblings + transport_means + wkly_study_hours, data = writing)
 
 summary(lm_model)
+```
+
+Correlation Matrix
+```{r}
+writing = writing |> 
+  mutate(across(c(gender, ethnic_group, parent_educ, lunch_type, test_prep, parent_marital_status, practice_sport, is_first_child, nr_siblings, transport_means, wkly_study_hours), as.factor))
+
+writing_encoded = writing |> 
+  mutate(across(where(is.factor), as.numeric))
+
+cor_writing = writing_encoded |> 
+  select_if(is.numeric)
+
+cor_matrix = cor(cor_writing, use = "complete.obs", method = "pearson")
+
+print(cor_matrix)
+```
+
+```{r}
+cor_table = knitr::kable(cor_matrix, format = "markdown")
+
+print(cor_table)
+```
+
+Backward Elimination Method
+```{r}
+full_model = lm(writing_score ~ gender + ethnic_group + parent_educ + lunch_type + test_prep + parent_marital_status + practice_sport + is_first_child + nr_siblings + transport_means + wkly_study_hours, data = writing)
+
+backward_model = step(full_model, direction = "backward")
+
+summary(backward_model)
+```
+
+Forward Selection
+```{r}
+empty_model = lm(writing_score ~ 1, data = writing)
+
+forward_model = step(empty_model, 
+                     scope = list(lower = empty_model, 
+                                  upper = ~ gender + ethnic_group + parent_educ + lunch_type + test_prep + parent_marital_status + practice_sport + is_first_child + nr_siblings + transport_means + wkly_study_hours), direction = "forward")
+
+summary(forward_model)
+```
+
+
+Stepwise Method (stepAIC)
+```{r}
+null_model = lm(writing_score ~ 1, data = writing)
+
+stepwise_model = stepAIC(full_model, direction = "both", trace = TRUE)
+
+summary(stepwise_model)
 ```
 
