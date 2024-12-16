@@ -426,7 +426,7 @@ significant_terms_df <- data.frame(
 print(significant_terms_df)
   
 ```
-interactions: ethnic group E and test prep none
+
 ```{r}
 interaction_model = lm(math_score ~ parent_educ+
 test_prep+ 
@@ -562,8 +562,6 @@ if (length(significant_pairs) > 0) {
 
 ```
 
-
-
 # lasso
 ```{r}
 x <- model.matrix(math_score ~ ., data = math_df_numeric)[, -1]
@@ -571,7 +569,6 @@ y <- math_df_numeric$math_score
 
 lasso_model <- cv.glmnet(x, y, alpha = 1)
 coef(lasso_model, s = "lambda.min")
-
 ```
 
 
