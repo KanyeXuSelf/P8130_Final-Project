@@ -21,8 +21,6 @@ head(writing)
 ```
 
 
-*    get rid of NA in specific plots
-
 ### Descriptive Statistics
 ```{r}
 summary(writing$writing_score)
@@ -67,6 +65,7 @@ ggplot(writing, aes(x = gender, y = writing_score)) +
     x = "Gender",
     y = "Writing Score")
 ```
+
 
 ```{r}
 ggplot(writing, aes(x = ethnic_group, y = writing_score)) +
@@ -164,3 +163,10 @@ t_test = t.test(writing_score ~ gender, data = writing)
 
 print(t_test)
 ```
+
+```{r}
+lm_model = lm(writing_score ~ gender + ethnic_group + parent_educ + lunch_type + test_prep + parent_marital_status + practice_sport + is_first_child + nr_siblings + transport_means + wkly_study_hours, data = writing)
+
+summary(lm_model)
+```
+
