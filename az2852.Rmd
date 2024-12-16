@@ -33,6 +33,11 @@ math_df =
   score_df %>% 
   dplyr::select(-reading_score, -writing_score) %>% 
   dplyr::select(math_score, everything())
+
+# convert data to numeric
+math_df_numeric = math_df %>% 
+  mutate(across(where(is.factor), ~ as.numeric(.)))
+```
 ```
 ```{r}
 # Descriptive Statistics
@@ -141,20 +146,6 @@ visualize correlations
 ```{r}
 pairs(math_df_numeric)
 corrplot(cor(math_df_numeric), type = "upper", diag = FALSE)
-
-
-# Adjust the color scale to increase visibility
-corrplot(cor(math_df_numeric), 
-         type = "upper",           # Only show the upper part of the matrix
-         diag = FALSE,             # Hide diagonal
-         col = colorRampPalette(c("blue", "white", "red"))(200),  # Custom color scale
-         is.corr = TRUE,           # Treat input as correlations
-         tl.col = "black",         # Text label color
-         tl.srt = 45,              # Rotate text labels
-         cl.lim = c(-1, 1),        # Set limits for the color legend
-         method = "color",         # Use color shading to represent values
-         number.cex = 0.7)         # Adjust size of correlation coefficients
-
 ```
 looks like math score is correlated with gender, ethnic group, parent education, lunch type, and test prep. Also slightly correlated with nr siblings and weekly study hours
 
@@ -237,11 +228,6 @@ vif(lm(math_score ~ ., data = math_df))
 None of the VIFs are larger than 5, so multi-colinearity is likely not a concern.
 
 Use criterion-based procedures to guide your selection of the ‘best subset’. Summarize your results (tabular or graphical).
-```{r}
-# convert data to numeric
-math_df_numeric = math_df %>% 
-  mutate(across(where(is.factor), ~ as.numeric(.)))
-```
 
 ```{r}
 mat = as.matrix(math_df_numeric)
