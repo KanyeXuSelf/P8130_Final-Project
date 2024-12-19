@@ -1,0 +1,148 @@
+---
+title: "Reading_score_analysis"
+author: "Kangyu Xu (kx2224)"
+date: "2024-12-18"
+output: github_document
+---
+
+```{r}
+library(tidyverse)
+library(caret)
+library(leaps)
+library(glmnet)
+library(MASS)      # for Box-Cox transformation
+library(ggfortify) # for model diagnostics
+library(performance) # for VIF
+```
+
+```{r}
+# data clean
+data <- read_csv("data/Project_1_data.csv") %>%
+  janitor::clean_names() %>%
+  drop_na()
+
+reading_df <- data %>%
+  dplyr::select(-math_score,-writing_score)|>
+  dplyr::select(reading_score, everything())
+reading_df_numeric <- reading_df %>%
+  mutate(across(where(is.factor), as.numeric))
+
+summary(reading_df)
+```
+
+```{r}
+y <- reading_df$reading_score
+X <- model.matrix(reading_score ~ ., data = reading_df_numeric)[, -1]
+
+#----------------------------------------------------
+# Forward、Backward and Stepwise regression
+#----------------------------------------------------
+full_model <- lm(reading_score ~ ., data = reading_df)
+null_model <- lm(reading_score ~ 1, data = reading_df)
+
+# Forward Selection
+forward_model <- step(null_model, direction = "forward", scope = formula(full_model), trace = FALSE)
+
+# Backward Elimination
+backward_model <- step(full_model, direction = "backward", trace = FALSE)
+
+# Stepwise Regression
+stepwise_model <- step(full_model, direction = "both", trace = FALSE)
+
+# Output model
+cat("Forward Selection Model:\n")
+summary(forward_model)
+
+cat("Backward Elimination Model:\n")
+summary(backward_model)
+
+cat("Stepwise Selection Model:\n")
+summary(stepwise_model)
+
+```
+
+
+```{r}
+#----------------------------------------------------
+# 3. Criterion-Based Model Selection
+#----------------------------------------------------
+# Use Cp and Adjusted R² 
+subset_model <- regsubsets(reading_score ~ ., data = reading_df, nbest = 1)
+subset_summary <- summary(subset_model)
+best_subset_formula <- as.formula("reading_score ~ .")
+# Visualize Cp and Adjusted R²
+par(mfrow = c(1, 2))
+plot(subset_summary$cp, xlab = "Number of Variables", ylab = "Cp Statistic", type = "b", main = "Cp Plot")
+abline(a = 0, b = 1, col = "red")
+plot(subset_summary$adjr2, xlab = "Number of Variables", ylab = "Adjusted R²", type = "b", main = "Adjusted R² Plot")
+
+```
+
+```{r}
+#----------------------------------------------------
+# 4. LASSO regression
+#----------------------------------------------------
+set.seed(123)
+lasso_cv <- cv.glmnet(X, y, alpha = 1) # alpha = 1 表示 LASSO
+best_lambda <- lasso_cv$lambda.min
+
+lasso_coefs <- coef(lasso_cv, s = best_lambda)
+print("LASSO Coefficients:")
+print(lasso_coefs)
+```
+
+
+
+```{r}
+#----------------------------------------------------
+# 5. Compare and Choose best model
+#----------------------------------------------------
+# Cross validation
+set.seed(123)
+train_control <- trainControl(method = "cv", number = 10)
+
+# Stepwise
+final_stepwise <- train(formula(stepwise_model), data = reading_df, method = "lm", trControl = train_control)
+
+# Criterion-based
+final_criterion <- train(best_subset_formula, data = reading_df, 
+                         method = "lm", 
+                         trControl = train_control)
+
+# LASSO
+lasso_preds <- predict(lasso_cv, newx = X, s = best_lambda)
+lasso_rmse <- sqrt(mean((y - lasso_preds)^2))
+
+cat("Stepwise RMSE:", final_stepwise$results$RMSE, "\n")
+cat("Criterion RMSE:", final_criterion$results$RMSE, "\n")
+cat("LASSO RMSE:", lasso_rmse, "\n")
+```
+
+
+
+
+```{r}
+#----------------------------------------------------
+# 6. Diagnosis
+#----------------------------------------------------
+cat("Final Stepwise Model Summary:\n")
+summary(stepwise_model)
+
+# diagnosis
+autoplot(stepwise_model)
+
+# VIF
+vif_values <- vif(stepwise_model)
+cat("Variance Inflation Factor (VIF):\n")
+print(vif_values)
+
+# Box-Cox
+boxcox(stepwise_model, lambda = seq(-2, 2, by = 0.1))
+```
+So we choose the stepwise model.
+
+## Interacting Effect Checking
+```{r}
+
+```
+
