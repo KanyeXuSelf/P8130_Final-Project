@@ -23,7 +23,15 @@ df = read_csv("data/Project_1_data.csv")
 score_df = df %>% 
   janitor::clean_names() %>% 
   drop_na() %>% # Drop rows with any missing values
-  mutate(across(where(is.character), as.factor))
+  mutate(across(where(is.character), as.factor)) %>% 
+  mutate(
+    parent_educ = fct_relevel(parent_educ, "bachelor's degree"),
+    lunch_type = fct_relevel(lunch_type, "standard"),
+    parent_marital_status = fct_relevel(parent_marital_status, "married"),
+    practice_sport = fct_relevel(practice_sport, "never"),
+    wkly_study_hours = fct_relevel(wkly_study_hours, "<5"),
+    transport_means = fct_relevel( transport_means, "private")
+  )
   
 
 score_df
@@ -191,35 +199,21 @@ summary(stepwise_model)
 
 * Do the procedures generate the same model?
 
-### backward elimination model
-significant predictors (7), same as stepwise model: 
-`gender`
-`ethnic_group`
-`parent_educ`
-`lunch_type`
-`test_prep`
-`parent_marital_status`
-`wkly_study_hours`
+### backward elimination model (8)
+Call:
+lm(formula = math_score ~ gender + ethnic_group + parent_educ + 
+    lunch_type + test_prep + parent_marital_status + nr_siblings + 
+    wkly_study_hours, data = math_df)
 
-### forward selection model
-significant predictors (5): 
-`gender` not significant
-`ethnic_group`
-`parent_educ`
-`lunch_type`
-`test_prep` not significant
-`parent_marital_status`
-`wkly_study_hours`
+### forward selection model (8)
+lm(formula = math_score ~ lunch_type + ethnic_group + test_prep + 
+    gender + parent_educ + parent_marital_status + wkly_study_hours + 
+    nr_siblings, data = math_df)
 
-### step-wise regression model
-significant predictors (7): 
-`gender`
-`ethnic_group`
-`parent_educ`
-`lunch_type`
-`test_prep`
-`parent_marital_status`
-`wkly_study_hours`
+### step-wise regression model (8)
+lm(formula = math_score ~ gender + ethnic_group + parent_educ + 
+    lunch_type + test_prep + parent_marital_status + nr_siblings + 
+    wkly_study_hours, data = math_df)
 
 Since multi-colinearity can make a predictor appear less significant, we should check for it.
 ```{r}
@@ -288,8 +282,9 @@ The LASSO model narrows down to 9 predictors:
 ### 7-predictor model
 * how are the models in terms of assumptions?
 ```{r}
-model_1 = lm(math_score ~ gender + ethnic_group + parent_educ + lunch_type
-+ test_prep + parent_marital_status + wkly_study_hours, data = math_df)
+model_1 = lm(math_score ~ gender + ethnic_group + parent_educ + 
+    lunch_type + test_prep + parent_marital_status + nr_siblings + 
+    wkly_study_hours, data = math_df)
 
 plot(model_1)
 ```
@@ -322,13 +317,6 @@ plot(model_1.7)
 ```
 The QQ plot did not get better with transformation.
 
-### 5-predictor model
-```{r}
-model_2 = lm(math_score ~ ethnic_group + parent_educ + lunch_type + parent_marital_status + wkly_study_hours, data = math_df)
-
-plot(model_2)
-```
-looks good (?)
 ### 9-predictor model
 ```{r}
 model_3 = lm(math_score ~ gender + ethnic_group + parent_educ + lunch_type
@@ -340,16 +328,17 @@ plot(model_3)
 same issue with QQ plot
 
 ## Predictive power
-### 7-predictor model
-RMSE 13.70
+### 8-predictor model
+RMSE 13.71652
 ```{r}
 set.seed(1)
 # Use 10-fold validation and create the training sets
 train = trainControl(method = "cv", number = 10)
 
 # Fit the 4-variables model
-model_caret = train(math_score ~ gender + ethnic_group + parent_educ + lunch_type
-+ test_prep + parent_marital_status + wkly_study_hours, data = math_df,
+model_caret = train(math_score ~ gender + ethnic_group + parent_educ + 
+    lunch_type + test_prep + parent_marital_status + nr_siblings + 
+    wkly_study_hours, data = math_df,
                    trControl = train,
                    method = 'lm',
                    na.action = na.pass)
@@ -357,22 +346,9 @@ model_caret = train(math_score ~ gender + ethnic_group + parent_educ + lunch_typ
 model_caret$finalModel
 print(model_caret)
 ```
-### 5-predictor model
-RMSE 14.13
-```{r}
-train = trainControl(method = "cv", number = 10)
 
-# Fit the 4-variables model
-model_caret = train(math_score ~ ethnic_group + parent_educ + lunch_type + parent_marital_status + wkly_study_hours, data = math_df,
-                   trControl = train,
-                   method = 'lm',
-                   na.action = na.pass)
-
-model_caret$finalModel
-print(model_caret)
-```
 ### 9-predictor model
-RMSE 13.72
+RMSE 13.68887
 ```{r}
 train = trainControl(method = "cv", number = 10)
 
@@ -390,11 +366,11 @@ print(model_caret)
 
 
 ```{r}
-interaction_model_9 = lm(math_score ~ (gender + ethnic_group + parent_educ + lunch_type
-+ test_prep + parent_marital_status + wkly_study_hours + is_first_child + nr_siblings)^2, 
-                        data = math_df)
+interaction_model_8 = lm(math_score ~ (gender + ethnic_group + parent_educ + 
+    lunch_type + test_prep + parent_marital_status + nr_siblings + 
+    wkly_study_hours)^2, data = math_df)
 
-model_summary = summary(interaction_model_9)
+model_summary = summary(interaction_model_8)
 
 coeff_table <- model_summary$coefficients
 
@@ -412,149 +388,19 @@ significant_terms_df <- data.frame(
 print(significant_terms_df)
   
 ```
-
+Why does test preparation have a varying effect based on ethnic group or marital status?
+Does the interaction between weekly study hours and marital status reflect broader socioeconomic patterns?
 ```{r}
-interaction_model = lm(math_score ~ parent_educ+
-test_prep+ 
-parent_marital_status+
-gender*parent_educ+
-ethnic_group*test_prep + 
-parent_educ*parent_marital_status+ 
-parent_marital_status*wkly_study_hours+ 
-parent_marital_status*is_first_child, data = math_df)
+interaction_model_final = lm(math_score ~ gender + ethnic_group + parent_educ + 
+    lunch_type + test_prep + parent_marital_status + nr_siblings + 
+    wkly_study_hours + 
+      ethnic_group:test_prep +
+      parent_educ:parent_marital_status +
+      test_prep:parent_marital_status +
+      parent_marital_status:wkly_study_hours, data = math_df)
 
-summary(interaction_model)
-  
+summary(interaction_model_final)
 ```
 
-
-
-Overall, the 7 predictors is the best (?)
-
-
-# are there interaction effects?
-```{r}
- # Fit a linear model with all two-way interactions
-interaction_model <- lm(math_score ~ (gender + ethnic_group + parent_educ + lunch_type + 
-                                      test_prep + parent_marital_status + practice_sport + 
-                                      is_first_child + nr_siblings + transport_means + 
-                                      wkly_study_hours)^2, 
-                        data = math_df)
-
-# Summarize the model
-model_summary = summary(interaction_model)
-
-coeff_table <- model_summary$coefficients
-
-# Filter for significant terms (p-value < 0.05)
-significant_terms <- coeff_table[coeff_table[, "Pr(>|t|)"] < 0.05, ]
-
-# Create a data frame for better readability
-significant_terms_df <- data.frame(
-  Term = rownames(significant_terms),
-  Coefficient = significant_terms[, "Estimate"],
-  P_Value = significant_terms[, "Pr(>|t|)"]
-)
-
-# Print the significant terms
-print(significant_terms_df)
-```
-
-Adjusted R-squared:  0.3513
-```{r}
-# Perform stepwise selection
-final_model <- stepAIC(interaction_model, direction = "both")
-
-# Summarize the final model
-summary(final_model)
-
-# Extract the summary of the final model
-model_summary <- summary(final_model)
-
-# Get the coefficients table
-coeff_table <- model_summary$coefficients
-
-# Filter for significant terms (p-value < 0.05)
-significant_terms <- coeff_table[coeff_table[, "Pr(>|t|)"] < 0.05, ]
-
-# Create a data frame for better readability
-significant_terms_df <- data.frame(
-  Term = rownames(significant_terms),
-  Coefficient = significant_terms[, "Estimate"],
-  P_Value = significant_terms[, "Pr(>|t|)"]
-)
-
-# Print the significant terms
-print(significant_terms_df)
-```
-check for redundant predictors
-```{r}
-vif(final_model)
-
-# Calculate VIF
-vif_values <- vif(final_model)
-
-# extract terms with VIF > 5
-high_vif_terms <- vif_values[vif_values > 5]
-high_vif_terms
-```
-Cross-tabulation to check for correlation between categorical variables
-```{r}
-cat_vars <- c("gender", "ethnic_group", "parent_educ", "lunch_type", 
-              "test_prep", "parent_marital_status", "practice_sport", 
-              "is_first_child", "transport_means", "wkly_study_hours")
-
-for (i in 1:(length(cat_vars) - 1)) {
-  for (j in (i + 1):length(cat_vars)) {
-    cat("\nCross-tabulation: ", cat_vars[i], " vs ", cat_vars[j], "\n")
-    print(table(math_df[[cat_vars[i]]], math_df[[cat_vars[j]]]))
-    print(chisq.test(table(math_df[[cat_vars[i]]], math_df[[cat_vars[j]]]))$p.value)
-  }
-}
-
-```
-
-```{r}
-cat_vars <- c("gender", "ethnic_group", "parent_educ", "lunch_type", 
-              "test_prep", "parent_marital_status", "practice_sport", 
-              "is_first_child", "transport_means", "wkly_study_hours")
-
-significant_pairs <- list()  # To store the significant variable pairs
-
-for (i in 1:(length(cat_vars) - 1)) {
-  for (j in (i + 1):length(cat_vars)) {
-    # Cross-tabulation table
-    ctab <- table(math_df[[cat_vars[i]]], math_df[[cat_vars[j]]])
-    
-    # Perform Chi-square test
-    chi_result <- chisq.test(ctab)
-    
-    # Check if the p-value is significant
-    if (chi_result$p.value < 0.1) {
-      cat("\nSignificant dependent variables: ", cat_vars[i], " vs ", cat_vars[j], "\n")
-      cat("p-value:", chi_result$p.value, "\n")
-      significant_pairs[[length(significant_pairs) + 1]] <- c(cat_vars[i], cat_vars[j], chi_result$p.value)
-    }
-  }
-}
-
-# Print the significant pairs
-if (length(significant_pairs) > 0) {
-  cat("\nSignificant variable pairs:\n")
-  print(significant_pairs)
-} else {
-  cat("\nNo significant dependencies found.\n")
-}
-
-```
-
-# lasso
-```{r}
-x <- model.matrix(math_score ~ ., data = math_df_numeric)[, -1]
-y <- math_df_numeric$math_score
-
-lasso_model <- cv.glmnet(x, y, alpha = 1)
-coef(lasso_model, s = "lambda.min")
-```
 
 
