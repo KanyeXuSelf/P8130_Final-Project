@@ -7,6 +7,9 @@ output: github_document
 library(tidyverse)
 library(dplyr)
 library(MASS)
+library(car)
+library(glmnet)
+library(caret)
 ```
 
 
@@ -221,3 +224,93 @@ stepwise_model = stepAIC(full_model, direction = "both", trace = TRUE)
 summary(stepwise_model)
 ```
 
+### Checking for Multicollinearity
+```{r}
+vif_values = vif(lm_model)
+print(vif_values)
+
+high_vif = vif_values[vif_values > 5]
+print(high_vif)
+```
+
+### Criterion-Based Procedures
+
+Applying AIC-Based Stepwise Selection
+```{r}
+aic_stepwise = stepAIC(full_model, scope = list(lower = null_model, upper = full_model), direction = "both", trace = TRUE)
+
+summary(aic_stepwise)
+```
+
+Applying BIC-Based Stepwise Selection
+```{r}
+n = nrow(writing)
+bic_stepwise = stepAIC(full_model, scope = list(lower = null_model, upper = full_model), direction = "both", trace = TRUE, k = log(n))
+
+summary(bic_stepwise)
+```
+
+### LASSO
+```{r}
+X = model.matrix(writing_score ~ gender + ethnic_group + parent_educ + lunch_type + test_prep + parent_marital_status + practice_sport + is_first_child + nr_siblings + transport_means + wkly_study_hours, data = writing)[, -1]
+
+Y = writing$writing_score
+```
+
+```{r}
+set.seed(123)
+lasso_cv = cv.glmnet(X, Y, alpha = 1)
+```
+
+```{r}
+best_lambda = lasso_cv$lambda.min
+lasso_model = glmnet(X, Y, alpha = 1, lambda = best_lambda)
+```
+
+```{r}
+lasso_coefficients = coef(lasso_model)
+print(lasso_coefficients)
+```
+
+### Predictive Power through cross-validation
+```{r}
+set.seed(123)
+train_control = trainControl(method = "cv", number = 10)
+
+lasso_caret = train(
+  writing_score ~ gender + ethnic_group + parent_educ + lunch_type + test_prep + parent_marital_status + practice_sport + is_first_child + nr_siblings + transport_means + wkly_study_hours, data = writing, method = "glmnet", trControl = train_control, tuneGrid = expand.grid(alpha = 1, lambda = seq(0.001, 1, length = 100)))
+
+print(lasso_caret)
+```
+
+```{r}
+predictions = predict(lasso_caret$finalModel, newx = X, s = lasso_caret$bestTune$lambda)
+
+mse = mean((predictions - Y)^2)
+r2 = 1 - (sum((Y - predictions)^2) / sum((Y - mean(Y))^2))
+mae = mean(abs(predictions - Y))
+
+print(paste("Test RMSE:", sqrt(mse)))
+print(paste("Test R-Squared:", r2))
+print(paste("Test MAE:", mae))
+```
+
+```{r}
+dev.new()
+plot(residuals(lasso_caret), main = "Residuals Plot", ylab = "Residuals")
+abline(h = 0, col = "red")
+```
+
+### Interaction Effect
+```{r}
+interaction_model = lm(writing_score ~ gender * practice_sport + parent_educ * test_prep, data = writing)
+
+summary(interaction_model)
+```
+
+ANOVA
+```{r}
+base_model = lm(writing_score ~ gender + practice_sport, data = writing)
+
+anova(base_model, interaction_model)
+```
