@@ -164,6 +164,7 @@ ggplot(writing, aes(x = wkly_study_hours, y = writing_score)) +
 ```
 
 ## Statistical Testing
+We used procedures to investigate significant predictors associated with writing scores. 
 
 ### Linear Regression 
 ```{r}
@@ -171,6 +172,9 @@ lm_model = lm(writing_score ~ gender + ethnic_group + parent_educ + lunch_type +
 
 summary(lm_model)
 ```
+We used procedures to investigate significant predictors associated with writing scores. Backward, forward, and stepwise as well as criterion-based and LASSO regression was used to model the predictors against writing scores and identify significant predictors. The significant predictors extracted in the model are gender, ethnic group, parent education, lunch type, test preparation, parent marital status and weekly study hours. 
+
+We first used linear regression to model the relationship between writing scores and predictors to quantify the strength and direction of the relationship. The significant predictors with p-values less than 0.05 which indicates a statistically significant relationship are gender (Male), ethnic group (D, E), parent education, (Some High School, High School, Master's Degree), lunch type (Standard), test prep (None), parent marital status (Married), and weekly study hours (10-May). 
 
 ### Correlation Matrix
 ```{r}
@@ -193,6 +197,7 @@ cor_table = knitr::kable(cor_matrix, format = "markdown")
 
 print(cor_table)
 ```
+Pearson's correlation is used to measure the linear relationship between variables and improve interpretibility.
 
 ### Backward Elimination Method
 ```{r}
@@ -203,7 +208,8 @@ backward_model = step(full_model, direction = "backward")
 summary(backward_model)
 ```
 
-Forward Selection
+
+### Forward Selection
 ```{r}
 empty_model = lm(writing_score ~ 1, data = writing)
 
@@ -214,7 +220,6 @@ forward_model = step(empty_model,
 summary(forward_model)
 ```
 
-
 ### Stepwise Method (stepAIC)
 ```{r}
 null_model = lm(writing_score ~ 1, data = writing)
@@ -223,6 +228,7 @@ stepwise_model = stepAIC(full_model, direction = "both", trace = TRUE)
 
 summary(stepwise_model)
 ```
+Backward, forward, and stepwise are used for model selection and used to identfy important predictors by simplifying the model and reducing overfitting. The three models confirm the significant predictors indentified in the linear regression model.
 
 ### Checking for Multicollinearity
 ```{r}
@@ -232,6 +238,7 @@ print(vif_values)
 high_vif = vif_values[vif_values > 5]
 print(high_vif)
 ```
+We checked for multicollinearity by calculating the Variance Inflation Factor (VIF) for each predictor. Since none of the values exceed 5, there are no collinearity issues that could inflate standard errors and lead to unreliable coefficient estimates.
 
 ### Criterion-Based Procedures
 
@@ -249,6 +256,7 @@ bic_stepwise = stepAIC(full_model, scope = list(lower = null_model, upper = full
 
 summary(bic_stepwise)
 ```
+Criterion-based selection is used to identify the model that offers the best trade-off of fit and simplicity to avoid overfitting. AIC measure the goodness of fit and BIC is similar but includes a heavier penatly for adding additinoal predictors.
 
 ### LASSO
 ```{r}
@@ -314,3 +322,5 @@ base_model = lm(writing_score ~ gender + practice_sport, data = writing)
 
 anova(base_model, interaction_model)
 ```
+
+Procedures as mentioned help to simplify the model and improve prediction accuracy. Interaction effects were also explored and metrics were computed to asses the model's predictive power. 
