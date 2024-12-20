@@ -176,6 +176,10 @@ We used procedures to investigate significant predictors associated with writing
 
 We first used linear regression to model the relationship between writing scores and predictors to quantify the strength and direction of the relationship. The significant predictors with p-values less than 0.05 which indicates a statistically significant relationship are gender (Male), ethnic group (D, E), parent education, (Some High School, High School, Master's Degree), lunch type (Standard), test prep (None), parent marital status (Married), and weekly study hours (10-May). 
 
+The residual standard error of 12.65 indicates the model's predicitions are off by about 12.65 points.
+The multiple R-squared of 0.3634 means about 36.34% of the variation in the writing scores can be explained by the predictors.
+The f-statistic of 14.63 and a p-value of less than 0.05 indicates a highly significant model. 
+
 ### Correlation Matrix
 ```{r}
 writing = writing |> 
@@ -197,7 +201,10 @@ cor_table = knitr::kable(cor_matrix, format = "markdown")
 
 print(cor_table)
 ```
-Pearson's correlation is used to measure the linear relationship between variables and improve interpretibility.
+Pearson's correlation is used to measure the linear relationship between variables and improve interpretibility. According to the correlation matrix, there is strong positive correlation between writing and reading scores as well as writing and math scores, 0.96 and 0.81 respectively. This suggests that students who do well in writing, tend to do well in reading and math, and more likely perform better in reading compared to math.
+
+Additionally, the predictors indicate correlation with writing scores. 
+Gender has a negative correlation of -0.28, indicating that males tend to have lower writing scores compared to females. Lunch type shows a moderate positive correlation of 0.27 meaning students on a standard lunch plan tend to perform better. Furthermore, test prep has a negative correlation with writing scores of -0.26 which means students who did not complete test prep tend to have lower scores. These predictors showed significant correlation with writing scores, aligning with regression analysis. 
 
 ### Backward Elimination Method
 ```{r}
@@ -238,7 +245,7 @@ print(vif_values)
 high_vif = vif_values[vif_values > 5]
 print(high_vif)
 ```
-We checked for multicollinearity by calculating the Variance Inflation Factor (VIF) for each predictor. Since none of the values exceed 5, there are no collinearity issues that could inflate standard errors and lead to unreliable coefficient estimates.
+We checked for multicollinearity by calculating the Variance Inflation Factor (VIF) for each predictor. Since none of the values exceed 5, there are no collinearity issues that could inflate standard errors and lead to unreliable coefficient estimates. 
 
 ### Criterion-Based Procedures
 
@@ -256,7 +263,7 @@ bic_stepwise = stepAIC(full_model, scope = list(lower = null_model, upper = full
 
 summary(bic_stepwise)
 ```
-Criterion-based selection is used to identify the model that offers the best trade-off of fit and simplicity to avoid overfitting. AIC measure the goodness of fit and BIC is similar but includes a heavier penatly for adding additinoal predictors.
+Criterion-based selection is used to identify the model that offers the best trade-off of fit and simplicity to avoid overfitting. AIC measure the goodness of fit and BIC is similar but includes a heavier penatly for adding additional predictors.
 
 ### LASSO
 ```{r}
@@ -279,6 +286,8 @@ lasso_model = glmnet(X, Y, alpha = 1, lambda = best_lambda)
 lasso_coefficients = coef(lasso_model)
 print(lasso_coefficients)
 ```
+The LASSO regression performs both variable selection and regularization. According to the model, the variables with meaningful contribution are gender and lunch type. Gender has a coefficient of -8.64 indicating that male students have a writing score 8.64 points lower than female students on average. Lunch type has a coefficient of 8.57 indicating that students with a standard lunch type score 8.57 points higher on average than those with free/reduced lunch. Additionally, ethnic group and practice sport have coefficients of 0 indicating no significant impact on writing scores.
+
 
 ### Predictive Power through cross-validation
 ```{r}
@@ -323,4 +332,6 @@ base_model = lm(writing_score ~ gender + practice_sport, data = writing)
 anova(base_model, interaction_model)
 ```
 
-Procedures as mentioned help to simplify the model and improve prediction accuracy. Interaction effects were also explored and metrics were computed to asses the model's predictive power. 
+Procedures as mentioned help to simplify the model and improve prediction accuracy. Interaction effects were also explored and metrics were computed to asses the model's predictive power. From the model, males consistently score lower than females, regardless of sport participation, completing test prep has a positive impact on writing scores, and lower parent educaation are associated with significantly lower scores, however, higher parent education does not schow significant benefit.
+
+It is important to note that the R-sqaured suggets that there are important predictors of writing scores not included and that there are no significant interaction effects.
