@@ -152,6 +152,40 @@ anova(stepwise_model, interaction_model)
 ```
 As the F-test's result is 0.2357 > 0.05, so we can conclude that there are no interacting effects on this model.
 
+```{r}
+# Fit all second-order interactions
+fit_all_interactions <- lm(reading_score ~ (gender + ethnic_group + parent_educ + 
+    lunch_type + test_prep + parent_marital_status + nr_siblings + 
+    wkly_study_hours)^2, data = reading_df)
+
+# Extract p-values for interaction terms
+interaction_pvals = broom::tidy(fit_all_interactions) %>%
+  filter(str_detect(term, ":")) %>% # Keep only interaction terms
+  dplyr::select(term, p.value) %>%
+  arrange(p.value)
+
+significant_interactions <- interaction_pvals %>%
+  filter(p.value < 0.05)
+
+print(significant_interactions)
+```
+
+```{r}
+interaction_model_1.2 = lm(reading_score ~ gender + ethnic_group + parent_educ + 
+    lunch_type + test_prep + parent_marital_status + nr_siblings + 
+    wkly_study_hours + 
+      parent_marital_status:wkly_study_hours + 
+      ethnic_group:test_prep+
+      parent_educ:parent_marital_status, data = reading_df)
+
+summary(interaction_model_1.2)
+```
+
+
+
+
+
+
 ## Question3
 ```{r}
 baseline_model = stepwise_model
