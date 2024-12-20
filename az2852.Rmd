@@ -8,6 +8,7 @@ editor_options:
 
 ```{r setup, message=FALSE}
 library(tidyverse)
+library(broom)
 library(corrplot)
 library(leaps)
 library(glmnet)
@@ -30,6 +31,7 @@ score_df = df %>%
     parent_marital_status = fct_relevel(parent_marital_status, "married"),
     practice_sport = fct_relevel(practice_sport, "never"),
     wkly_study_hours = fct_relevel(wkly_study_hours, "<5"),
+    wkly_study_hours = fct_recode(wkly_study_hours, "5 to 10" = "10-May"),
     transport_means = fct_relevel( transport_means, "private")
   )
   
@@ -329,7 +331,8 @@ same issue with QQ plot
 
 ## Predictive power
 ### 8-predictor model
-RMSE 13.71652
+RMSE      Rsquared   MAE     
+  13.71652  0.2769511  11.15795
 ```{r}
 set.seed(1)
 # Use 10-fold validation and create the training sets
@@ -365,6 +368,50 @@ print(model_caret)
 ```
 
 
+
+Why does test preparation have a varying effect based on ethnic group or marital status?
+Does the interaction between weekly study hours and marital status reflect broader socioeconomic patterns?
+
+try visualization approach
+Cox and Wermuth (1996) or Cox (1984) discussed some methods for detecting interactions. The problem is usually how general the interaction terms should be. Basically, we (a) fit (and test) all second-order interaction terms, one at a time, and (b) plot their corresponding p-values (i.e., the No. terms as a function of 1−𝑝). The idea is then to look if a certain number of interaction terms should be retained: Under the assumption that all interaction terms are null the distribution of the p-values should be uniform (or equivalently, the points on the scatterplot should be roughly distributed along a line passing through the origin).
+
+fitting many (if not all) interactions might lead to overfitting, but it is also useless in a certain sense (some high-order interaction terms often have no sense at all). However, this has to do with interpretation, not detection of interactions
+```{r}
+# Fit all second-order interactions
+fit_all_interactions <- lm(math_score ~ (gender + ethnic_group + parent_educ + 
+    lunch_type + test_prep + parent_marital_status + nr_siblings + 
+    wkly_study_hours)^2, data = math_df)
+
+# Extract p-values for interaction terms
+interaction_pvals = tidy(fit_all_interactions) %>%
+  filter(str_detect(term, ":")) %>% # Keep only interaction terms
+  dplyr::select(term, p.value) %>%
+  arrange(p.value)
+
+# Add rank for plotting
+interaction_pvals <- interaction_pvals %>%
+  mutate(rank = row_number())
+
+# Plot p-values against 1 - p
+ggplot(interaction_pvals, aes(x = rank, y = 1 - p.value)) +
+  geom_point() +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
+  labs(
+    x = "Rank of interaction term",
+    y = "1 - P-value",
+    title = "Detection of Interaction Effects",
+    subtitle = "Assuming null hypothesis, points should align along the diagonal"
+  ) +
+  theme_minimal()
+
+# Print significant interaction terms
+significant_interactions <- interaction_pvals %>%
+  filter(p.value < 0.05)
+
+print(significant_interactions)
+
+```
+There might be some significant interactions. So we explored all two way interactions and found significant ones as follows.
 ```{r}
 interaction_model_8 = lm(math_score ~ (gender + ethnic_group + parent_educ + 
     lunch_type + test_prep + parent_marital_status + nr_siblings + 
@@ -385,22 +432,57 @@ significant_terms_df <- data.frame(
 )
 
 # Print the significant terms
-print(significant_terms_df)
+knitr::kable(significant_terms_df)
   
 ```
-Why does test preparation have a varying effect based on ethnic group or marital status?
-Does the interaction between weekly study hours and marital status reflect broader socioeconomic patterns?
+We add the significant ones one by one, keep the significant ones here. Thought: because we have 8 predictors, we will have 28 possible two way interactions. The multiple comparisons might lead to significance due to chance.
 ```{r}
-interaction_model_final = lm(math_score ~ gender + ethnic_group + parent_educ + 
+interaction_model_1.2 = lm(math_score ~ gender + ethnic_group + parent_educ + 
     lunch_type + test_prep + parent_marital_status + nr_siblings + 
     wkly_study_hours + 
-      ethnic_group:test_prep +
-      parent_educ:parent_marital_status +
-      test_prep:parent_marital_status +
-      parent_marital_status:wkly_study_hours, data = math_df)
+      parent_educ:parent_marital_status + 
+      test_prep:parent_marital_status, data = math_df)
 
-summary(interaction_model_final)
+summary(interaction_model_1.2)
+```
+The adjusted r squared is only .02 higher than before adding the interaction terms.
+
+Let's look at the model's predictive ability using a 10-fold cv
+
+for interaction_model_1.2 is
+RMSE      Rsquared     
+  13.77241  0.2788751
+vs the model without interactions:
+RMSE      Rsquared        
+  13.71652  0.2769511
+  
+The large model predicts no better than the small model. For simplicity, we choose the small model.
+```{r}
+# Use 10-fold validation and create the training sets
+train = trainControl(method = "cv", number = 10)
+
+# Fit the 4-variables model
+model_caret = train(math_score ~ gender + ethnic_group + parent_educ + 
+    lunch_type + test_prep + parent_marital_status + nr_siblings + 
+    wkly_study_hours + parent_educ:parent_marital_status + test_prep:parent_marital_status, data = math_df,
+                   trControl = train,
+                   method = 'lm',
+                   na.action = na.pass)
+
+model_caret$finalModel
+print(model_caret)
 ```
 
+# 3. Are the optimal prediction models similar or different across the three test scores? Is it possible to leverage one score as the auxiliary information to learn the model for another score (still its model against variables 1-11) better?
 
+```{r}
+scores_model = lm(math_score ~ gender + ethnic_group + parent_educ + 
+    lunch_type + test_prep + parent_marital_status + nr_siblings + wkly_study_hours + 
+      reading_score+
+      writing_score, data = score_df)
 
+summary(scores_model)
+```
+This model is doing really well, explaining about 89 percent of the variance in math scores.
+
+So yes, we definitely should add the other two scores to predict math scores in addition to the social and personal factors.
