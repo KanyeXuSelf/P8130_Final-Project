@@ -17,37 +17,37 @@ library(performance) # for VIF
 
 ```{r}
 # data clean
-data <- read_csv("data/Project_1_data.csv") %>%
-  janitor::clean_names() %>%
+data = read_csv("data/Project_1_data.csv") |>
+  janitor::clean_names() |>
   drop_na()
 
-reading_df <- data %>%
+reading_df = data |>
   dplyr::select(-math_score,-writing_score)|>
   dplyr::select(reading_score, everything())
-reading_df_numeric <- reading_df %>%
+reading_df_numeric = reading_df |>
   mutate(across(where(is.factor), as.numeric))
 
 summary(reading_df)
 ```
 
 ```{r}
-y <- reading_df$reading_score
-X <- model.matrix(reading_score ~ ., data = reading_df_numeric)[, -1]
+y = reading_df$reading_score
+X = model.matrix(reading_score ~ ., data = reading_df_numeric)[, -1]
 
 #----------------------------------------------------
 # Forward、Backward and Stepwise regression
 #----------------------------------------------------
-full_model <- lm(reading_score ~ ., data = reading_df)
-null_model <- lm(reading_score ~ 1, data = reading_df)
+full_model = lm(reading_score ~ ., data = reading_df)
+null_model = lm(reading_score ~ 1, data = reading_df)
 
 # Forward Selection
-forward_model <- step(null_model, direction = "forward", scope = formula(full_model), trace = FALSE)
+forward_model = step(null_model, direction = "forward", scope = formula(full_model), trace = FALSE)
 
 # Backward Elimination
-backward_model <- step(full_model, direction = "backward", trace = FALSE)
+backward_model = step(full_model, direction = "backward", trace = FALSE)
 
 # Stepwise Regression
-stepwise_model <- step(full_model, direction = "both", trace = FALSE)
+stepwise_model = step(full_model, direction = "both", trace = FALSE)
 
 # Output model
 cat("Forward Selection Model:\n")
@@ -67,9 +67,9 @@ summary(stepwise_model)
 # 3. Criterion-Based Model Selection
 #----------------------------------------------------
 # Use Cp and Adjusted R² 
-subset_model <- regsubsets(reading_score ~ ., data = reading_df, nbest = 1)
-subset_summary <- summary(subset_model)
-best_subset_formula <- as.formula("reading_score ~ .")
+subset_model = regsubsets(reading_score ~ ., data = reading_df, nbest = 1)
+subset_summary = summary(subset_model)
+best_subset_formula = as.formula("reading_score ~ .")
 # Visualize Cp and Adjusted R²
 par(mfrow = c(1, 2))
 plot(subset_summary$cp, xlab = "Number of Variables", ylab = "Cp Statistic", type = "b", main = "Cp Plot")
@@ -83,10 +83,10 @@ plot(subset_summary$adjr2, xlab = "Number of Variables", ylab = "Adjusted R²", 
 # 4. LASSO regression
 #----------------------------------------------------
 set.seed(123)
-lasso_cv <- cv.glmnet(X, y, alpha = 1) # alpha = 1 表示 LASSO
-best_lambda <- lasso_cv$lambda.min
+lasso_cv = cv.glmnet(X, y, alpha = 1) # alpha = 1 表示 LASSO
+best_lambda = lasso_cv$lambda.min
 
-lasso_coefs <- coef(lasso_cv, s = best_lambda)
+lasso_coefs = coef(lasso_cv, s = best_lambda)
 print("LASSO Coefficients:")
 print(lasso_coefs)
 ```
@@ -99,19 +99,19 @@ print(lasso_coefs)
 #----------------------------------------------------
 # Cross validation
 set.seed(123)
-train_control <- trainControl(method = "cv", number = 10)
+train_control = trainControl(method = "cv", number = 10)
 
 # Stepwise
-final_stepwise <- train(formula(stepwise_model), data = reading_df, method = "lm", trControl = train_control)
+final_stepwise = train(formula(stepwise_model), data = reading_df, method = "lm", trControl = train_control)
 
 # Criterion-based
-final_criterion <- train(best_subset_formula, data = reading_df, 
+final_criterion = train(best_subset_formula, data = reading_df, 
                          method = "lm", 
                          trControl = train_control)
 
 # LASSO
-lasso_preds <- predict(lasso_cv, newx = X, s = best_lambda)
-lasso_rmse <- sqrt(mean((y - lasso_preds)^2))
+lasso_preds = predict(lasso_cv, newx = X, s = best_lambda)
+lasso_rmse = sqrt(mean((y - lasso_preds)^2))
 
 cat("Stepwise RMSE:", final_stepwise$results$RMSE, "\n")
 cat("Criterion RMSE:", final_criterion$results$RMSE, "\n")
@@ -132,7 +132,7 @@ summary(stepwise_model)
 autoplot(stepwise_model)
 
 # VIF
-vif_values <- vif(stepwise_model)
+vif_values = car::vif(stepwise_model)
 cat("Variance Inflation Factor (VIF):\n")
 print(vif_values)
 
@@ -143,6 +143,58 @@ So we choose the stepwise model.
 
 ## Interacting Effect Checking
 ```{r}
+interaction_model = lm(reading_score ~ .^2, data = reading_df)
+summary(interaction_model)
+```
+
+```{r}
+anova(stepwise_model, interaction_model)
+```
+As the F-test's result is 0.2357 > 0.05, so we can conclude that there are no interacting effects on this model.
+
+## Question3
+```{r}
+baseline_model = stepwise_model
+augmented_formula <- update(formula(baseline_model), . ~ . + math_score + writing_score)
+augmented_model <- lm(augmented_formula, data = data)
+summary(augmented_model)
+```
+
+```{r}
+anova(baseline_model, augmented_model)
+```
+
+```{r}
+library(caret)
+
+set.seed(123)
+cv_baseline <- train(formula(baseline_model), data = data, 
+                     method = "lm", trControl = trainControl(method = "cv", number = 10))
+
+cv_augmented <- train(formula(augmented_model), data = data, 
+                      method = "lm", trControl = trainControl(method = "cv", number = 10))
+
+cat("Baseline Model RMSE:", cv_baseline$results$RMSE, "\n")
+cat("Augmented Model RMSE:", cv_augmented$results$RMSE, "\n")
 
 ```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
