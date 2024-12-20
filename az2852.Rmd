@@ -155,6 +155,7 @@ print(combined_plot)
 visualize correlations
 ```{r}
 pairs(math_df_numeric)
+png("correlation_plot.png", width = 6, height = 4, units = "in", res = 150)
 corrplot(cor(math_df_numeric), type = "upper", diag = FALSE)
 ```
 looks like math score is correlated with gender, ethnic group, parent education, lunch type, and test prep. Also slightly correlated with nr siblings and weekly study hours
@@ -180,7 +181,26 @@ summary(full_model)
 backward_model <- step(full_model, direction = "backward")
 
 summary(backward_model)
+
+model_summary = summary(backward_model)
+
+coeff_table <- model_summary$coefficients
+
+# Filter for significant terms (p-value < 0.05)
+significant_terms <- coeff_table[coeff_table[, "Pr(>|t|)"] < 0.05, ]
+
+# Create a data frame for better readability
+significant_terms_df <- data.frame(
+  Term = rownames(significant_terms),
+  Coefficient = significant_terms[, "Estimate"],
+  P_Value = significant_terms[, "Pr(>|t|)"]
+)
+
+# Print the significant terms
+knitr::kable(significant_terms_df)
+
 ```
+forward selection
 ```{r}
 # Null model (no predictors)
 null_model <- lm(math_score ~ 1, data = math_df)
@@ -190,32 +210,61 @@ forward_model <- step(null_model, direction = "forward", scope = formula(full_mo
 
 # Summary of the final model
 summary(forward_model)
+
+model_summary = summary(forward_model)
+
+coeff_table <- model_summary$coefficients
+
+# Filter for significant terms (p-value < 0.05)
+significant_terms <- coeff_table[coeff_table[, "Pr(>|t|)"] < 0.05, ]
+
+# Create a data frame for better readability
+significant_terms_df <- data.frame(
+  Term = rownames(significant_terms),
+  Coefficient = significant_terms[, "Estimate"],
+  P_Value = significant_terms[, "Pr(>|t|)"]
+)
+
+# Print the significant terms
+knitr::kable(significant_terms_df)
 ```
+stepwise
 ```{r}
 # Stepwise regression
 stepwise_model <- step(full_model, direction = "both")
 
 # Summary of the final model
 summary(stepwise_model)
+
+model_summary = summary(stepwise_model)
+
+coeff_table <- model_summary$coefficients
+
+# Filter for significant terms (p-value < 0.05)
+significant_terms <- coeff_table[coeff_table[, "Pr(>|t|)"] < 0.05, ]
+
+# Create a data frame for better readability
+significant_terms_df <- data.frame(
+  Term = rownames(significant_terms),
+  Coefficient = significant_terms[, "Estimate"],
+  P_Value = significant_terms[, "Pr(>|t|)"]
+)
+
+# Print the significant terms
+knitr::kable(significant_terms_df)
 ```
 
 * Do the procedures generate the same model?
 
-### backward elimination model (8)
-Call:
-lm(formula = math_score ~ gender + ethnic_group + parent_educ + 
-    lunch_type + test_prep + parent_marital_status + nr_siblings + 
-    wkly_study_hours, data = math_df)
+yes! significant predictors are (7):
 
-### forward selection model (8)
-lm(formula = math_score ~ lunch_type + ethnic_group + test_prep + 
-    gender + parent_educ + parent_marital_status + wkly_study_hours + 
-    nr_siblings, data = math_df)
-
-### step-wise regression model (8)
-lm(formula = math_score ~ gender + ethnic_group + parent_educ + 
-    lunch_type + test_prep + parent_marital_status + nr_siblings + 
-    wkly_study_hours, data = math_df)
+* Gender
+* ethnic_group
+* parent_educ
+* lunch_type
+* test_prep
+* parent_marital_status
+* wkly_study_hours
 
 Since multi-colinearity can make a predictor appear less significant, we should check for it.
 ```{r}
@@ -285,9 +334,10 @@ The LASSO model narrows down to 9 predictors:
 * how are the models in terms of assumptions?
 ```{r}
 model_1 = lm(math_score ~ gender + ethnic_group + parent_educ + 
-    lunch_type + test_prep + parent_marital_status + nr_siblings + 
+    lunch_type + test_prep + parent_marital_status +  
     wkly_study_hours, data = math_df)
 
+par(mfrow = c(2, 2))
 plot(model_1)
 ```
 QQ plot doesn't seem so normal, some deviation at large values. Let's try a transformation.
@@ -330,7 +380,7 @@ plot(model_3)
 same issue with QQ plot
 
 ## Predictive power
-### 8-predictor model
+### 7-predictor model
 RMSE      Rsquared   MAE     
   13.71652  0.2769511  11.15795
 ```{r}
@@ -340,7 +390,7 @@ train = trainControl(method = "cv", number = 10)
 
 # Fit the 4-variables model
 model_caret = train(math_score ~ gender + ethnic_group + parent_educ + 
-    lunch_type + test_prep + parent_marital_status + nr_siblings + 
+    lunch_type + test_prep + parent_marital_status + 
     wkly_study_hours, data = math_df,
                    trControl = train,
                    method = 'lm',
@@ -366,7 +416,6 @@ data = math_df,
 model_caret$finalModel
 print(model_caret)
 ```
-
 
 
 Why does test preparation have a varying effect based on ethnic group or marital status?
@@ -473,6 +522,29 @@ model_caret$finalModel
 print(model_caret)
 ```
 
+```{r}
+model_1 = lm(math_score ~ gender + ethnic_group + parent_educ + 
+    lunch_type + test_prep + parent_marital_status + nr_siblings + 
+    wkly_study_hours, data = math_df)
+
+model_summary = summary(model_1)
+
+coeff_table <- model_summary$coefficients
+
+# Filter for significant terms (p-value < 0.05)
+significant_terms <- coeff_table[coeff_table[, "Pr(>|t|)"] < 0.05, ]
+
+# Create a data frame for better readability
+significant_terms_df <- data.frame(
+  Term = rownames(significant_terms),
+  Coefficient = significant_terms[, "Estimate"],
+  P_Value = significant_terms[, "Pr(>|t|)"]
+)
+
+# Print the significant terms
+knitr::kable(significant_terms_df)
+```
+
 # 3. Are the optimal prediction models similar or different across the three test scores? Is it possible to leverage one score as the auxiliary information to learn the model for another score (still its model against variables 1-11) better?
 
 ```{r}
@@ -481,8 +553,42 @@ scores_model = lm(math_score ~ gender + ethnic_group + parent_educ +
       reading_score+
       writing_score, data = score_df)
 
-summary(scores_model)
+model_summary = summary(scores_model)
+
+coeff_table <- model_summary$coefficients
+
+# Filter for significant terms (p-value < 0.05)
+significant_terms <- coeff_table[coeff_table[, "Pr(>|t|)"] < 0.05, ]
+
+# Create a data frame for better readability
+significant_terms_df <- data.frame(
+  Term = rownames(significant_terms),
+  Coefficient = significant_terms[, "Estimate"],
+  P_Value = significant_terms[, "Pr(>|t|)"]
+)
+
+# Print the significant terms
+knitr::kable(significant_terms_df)
 ```
 This model is doing really well, explaining about 89 percent of the variance in math scores.
+
+a cv show significantly improved performance
+RMSE     Rsquared   MAE     
+  5.49093  0.8855928  4.407864
+```{r}
+# Use 10-fold validation and create the training sets
+train = trainControl(method = "cv", number = 10)
+
+# Fit the 4-variables model
+model_caret = train(math_score ~ gender + ethnic_group + parent_educ + 
+    lunch_type + test_prep + parent_marital_status + nr_siblings + wkly_study_hours + 
+      reading_score + writing_score, data = score_df,
+                   trControl = train,
+                   method = 'lm',
+                   na.action = na.pass)
+
+model_caret$finalModel
+print(model_caret)
+```
 
 So yes, we definitely should add the other two scores to predict math scores in addition to the social and personal factors.
